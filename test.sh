@@ -2,7 +2,7 @@
 
 outdir=./test/
 if [[ ! -d $outdir ]]; then
-    mkdir =p $outdir
+    mkdir -p $outdir
 fi
 
 num_subclone=0
