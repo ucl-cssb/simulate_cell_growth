@@ -53,8 +53,8 @@ public:
 
     vector<Mutation> mutations;
 
-    Cell();
-    Cell(int cell_ID, int parent_ID);
+    // Cell();
+    Cell(int cell_ID, int parent_ID, int clone_ID);
     Cell(int cell_ID, int parent_ID, double birth_rate, double death_rate, double mutation_rate, double ploidy, double time_occur, double fitness);
 
     ~Cell() = default;
@@ -68,6 +68,8 @@ public:
 
     void update_mut_count(int multiple);    // Increase the number of mutations due to WGD
     int get_num_mut();
+
+    Cell* get_parent(vector<Cell>& cells);
 };
 
 
@@ -87,7 +89,7 @@ public:
     vector<int> subclone_ID;  // ID of subclones
     map<int, double> subclone_time;   // Time subclone emerges
     map<int, double> subclone_fitness;
-    map<int, int> subclone_parent;  // starting cell of subclones
+    map<int, int> subclone_parent;  // parents of subclones to track parent-child relationship of subclones
     map<int, int> subclone_psize;   // size of subclones
 
     double time_occur;
@@ -119,6 +121,7 @@ public:
     map<int, double> get_subclone_adiv();
 
     void print_lineage(vector<Cell> cells, string outfile);
+    void print_clone_lineage(string outfile);
     void print_summary(string outfile);
 
     template <typename T>

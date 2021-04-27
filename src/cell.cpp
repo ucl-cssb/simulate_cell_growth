@@ -30,27 +30,28 @@ Mutation::Mutation(int mut_ID, double time_occur){
 }
 
 
-Cell::Cell() {
-        cell_ID = 0;
-        parent_ID = 0;
-        clone_ID = 0;
+// Cell::Cell() {
+//         cell_ID = 0;
+//         parent_ID = 0;
+//         clone_ID = 0;
+//
+//         birth_rate = log(2);
+//         death_rate = 0;
+//         fitness = 0;
+//
+//         mutation_rate = 0;
+//
+//         ploidy = 2;
+//         num_division = 0;
+//         time_occur = 0;
+//         flag = 0;
+// }
 
-        birth_rate = log(2);
-        death_rate = 0;
-        fitness = 0;
 
-        mutation_rate = 0;
-
-        ploidy = 2;
-        num_division = 0;
-        time_occur = 0;
-        flag = 0;
-}
-
-Cell::Cell(int cell_ID, int parent_ID) {
+Cell::Cell(int cell_ID, int parent_ID, int clone_ID) {
         this->cell_ID = cell_ID;
         this->parent_ID = parent_ID;
-        this->clone_ID = 0;
+        this->clone_ID = clone_ID;
 
         this->birth_rate = log(2);
         this->death_rate = 0;
@@ -63,6 +64,7 @@ Cell::Cell(int cell_ID, int parent_ID) {
         this->time_occur = 0;
         this->flag = 0;
 }
+
 
 Cell::Cell(int cell_ID, int parent_ID, double birth_rate, double death_rate, double mutation_rate, double ploidy, double time_occur, double fitness = 0){
         this->cell_ID = cell_ID;
@@ -110,9 +112,10 @@ void Cell::generate_mutations_fixed(int& mut_ID, double time_occur, int num_mut)
         // cout << this->mutations.size() << endl;
 }
 
+
 // Some mutations may have multiple copies
 int Cell::get_num_mut(){
-    int sum=0;
+    int sum = 0;
     for (auto mut : this->mutations){
         sum += mut.number;
     }
@@ -120,9 +123,18 @@ int Cell::get_num_mut(){
 }
 
 
+Cell* Cell::get_parent(vector<Cell>& cells){
+    for(int i = 0; i < cells.size(); i++){
+        Cell* cell = &cells[i];
+        if(cell->cell_ID == parent_ID) return cell;
+    }
+    return NULL;
+}
+
+
 Clone::Clone(){
         clone_ID = 0;
-        num_clonal_mutation= 0;
+        num_clonal_mutation = 0;
         time_occur = 0;
         frequency = 0;
         fitness = 0; // neutral evolution
@@ -135,17 +147,19 @@ mut_ID: used to keep tracking the ID of new mutations, increased by 1 with a new
 nu: used to keep tracking the number of new mutations
 */
 void Clone::initialize(double death_rate, double mutation_rate, int& mut_ID, int& nu, int num_clonal_mutation, int verbose = 0){
-        this->clone_ID = 0;
+        this->clone_ID = 1;
 
         this->cells.clear();
         this->curr_cells.clear();
 
         this->subclone_ID.clear();
+        this->subclone_parent.clear();
         this->subclone_time.clear();
         this->subclone_fitness.clear();
         this->num_clonal_mutation = num_clonal_mutation;
 
-        Cell ncell(1, 0);
+        // set parent as 0 to indicate MRCA
+        Cell ncell(1, 0, 1);
         ncell.mutation_rate = mutation_rate;
         ncell.death_rate = death_rate;
         // Generate clonal mutations
@@ -238,13 +252,13 @@ void Clone::grow(int num_subclone, int num_clonal_mutation, vector<double> fitne
             double rmax = get_rmax();
 
             // increase time
-            uniform_real_distribution<double> runifu(0,1);
+            uniform_real_distribution<double> runifu(0, 1);
             double tau = -log(runifu(eng)); // an exponentially distributed random variable
             double deltaT = tau/(rmax * this->curr_cells.size());
             t += deltaT;
 
             // draw a random number
-            uniform_real_distribution<double> runif(0.0,rmax);
+            uniform_real_distribution<double> runif(0.0, rmax);
             double r = runif(eng);
             // cout << "random number " << r << endl;
             // birth event if r<birthrate
@@ -284,6 +298,7 @@ void Clone::grow(int num_subclone, int num_clonal_mutation, vector<double> fitne
                         cout << "   death rate: " << dcell1.death_rate << endl;
                         dcell1.clone_ID = clone_ID;
                         this->subclone_ID.push_back(clone_ID);
+                        this->subclone_parent[clone_ID] = rcell.clone_ID;
                         this->subclone_fitness[clone_ID] = fitval;
                         this->subclone_time[clone_ID] = t;
                         this->subclone_psize[clone_ID] = this->curr_cells.size();
@@ -477,7 +492,6 @@ map<int, double> Clone::get_subclone_freq(){
 }
 
 
-
 /*
    lambda: The net growth rate of the background host population
    freq: The frequency of a subclone
@@ -486,6 +500,7 @@ double Clone::get_subclone_fitness(double lambda, double freq, double tend, doub
     double s = (lambda * t1 + log(freq / (1 - freq))) / (lambda * (tend - t1));
     return s;
 }
+
 
 /*
 This function computes the theoretical subclone frequency.
@@ -549,7 +564,7 @@ void Clone::print_summary(string outfile) {
                 out << "\tAverage number of divisions per cell: " << subclone_adiv[subclone_ID[i]] << endl;
                 out << "\tPopulation size when subclone emerges: " << subclone_psize[subclone_ID[i]] << endl;
                 out << "\tTime subclone emerges (tumor doublings): " << log(subclone_psize[subclone_ID[i]])/(lambda) << endl;
-                // out << "\tParent of subclone (0 is host): " << subclone_parent[[subclone_ID[i]]];
+                out << "\tParent of subclone (0 is host): " << subclone_parent[subclone_ID[i]];
                 out << endl;
             }
     }
@@ -569,20 +584,43 @@ void Clone::print_lineage(vector<Cell> cells, string outfile){
         int num_cell = cells.size();
         cout << "There are " << num_cell << " cells in the history of tumor growth" << endl;
         // string header = "id\tparent_ID\tflag\tbirth_rate\tdeath_rate\tmutation_rate\tploidy\tnum_division\ttime_occur\n";
-        string header = "id\tparent_ID\tflag\tnum_mut\tclone_ID\n";
+        string header = "id\tparent_ID\tflag\tnum_mut\tclone_ID\ttime_occur\tbranch_len\tfitness\n";
         out << header;
         for(unsigned int i = 0; i < num_cell; i++) {
                 Cell cell = cells[i];
                 // cout << cell.cell_ID  << "\t" << cell.parent_ID << "\t" << cell.flag << "\t" << cell.birth_rate << "\t" << cell.death_rate << "\t" << cell.mutation_rate  << "\t" << cell.ploidy  << "\t" << cell.num_division << "\t" << cell.time_occur << endl;
                 int num_mut = cell.get_num_mut();
                 // int num_mut = cell.mutations.size();
+                if(cell.parent_ID == 0) continue;
+                Cell* pcell = cell.get_parent(cells);
+                double branch_len = cell.time_occur - pcell->time_occur;
+                double fitness = 1;
+                if(cell.clone_ID > 1){
+                  fitness = subclone_fitness[cell.clone_ID];
+                }
                 // write the cell lineages in a file for visualization
-                out << cell.cell_ID  << "\t" << cell.parent_ID << "\t" << cell.flag << "\t" << num_mut << "\t" << cell.clone_ID << endl;
+                out << cell.cell_ID << "\t" << cell.parent_ID << "\t" << cell.flag << "\t" << num_mut << "\t" << cell.clone_ID << "\t" << cell.time_occur << "\t" << branch_len << "\t" << fitness << endl;
                 // cout << "\t" << num_mut << " mutations in the cell: " << endl;
                 // for(unsigned int j = 0; j < num_mut; j++){
                 //     Mutation mut = cell.mutations[j];
                 //     cout << "\t" << mut.mut_ID << "\t" << mut.time_occur << endl;
                 // }
+        }
+        out.close();
+}
+
+
+/*
+   This method prints out the relationship among clones
+ */
+void Clone::print_clone_lineage(string outfile){
+        cout << "There are " << this->subclone_ID.size() << " clones in the history of tumor growth" << endl;
+        ofstream out;
+        out.open(outfile);
+        string header = "ID\tparent_ID\n";
+        out << header;
+        for (auto id : this->subclone_ID) {
+          out << id << "\t" << this->subclone_parent[id] << endl;
         }
         out.close();
 }

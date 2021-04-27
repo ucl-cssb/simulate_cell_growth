@@ -24,10 +24,10 @@ int main(int argc, char const *argv[]) {
     int verbose = 0;
 
     int num_clonal_mutation = 100;
-    double min_clone_freq = 0.5;
-    double max_clone_freq = 0.6;
+    double min_clone_freq = 0.2;
+    double max_clone_freq = 0.5;
     double tmin = 2;
-    double tmax = 3;
+    double tmax = 5;
 
     double read_depth =100;
     double cellularity = 0.6;
@@ -76,7 +76,7 @@ int main(int argc, char const *argv[]) {
     if(tmax > tend){
         tmax = tend;
     }
-    if(num_subclone>0){
+    if(num_subclone > 0){
         // randomly select times that subclones occur
         // To simulate a subclone caused by WGD, use tend/2 since it often occurs early.
         uniform_real_distribution<double> runift(tmin, tmax);
@@ -89,14 +89,14 @@ int main(int argc, char const *argv[]) {
 
         // randomly select fitness of subclones
         double s1, s2;
-        if(min_clone_freq==0){
-            s1=0;
+        if(min_clone_freq == 0){
+            s1 = 0;
         }
         else{
             s1 = clone.get_subclone_fitness(lambda, min_clone_freq, tend, time_occur[0]);
         }
-        if(max_clone_freq==1){
-            s2=1;
+        if(max_clone_freq == 1){
+            s2 = 1;
         }
         else{
             s2 = clone.get_subclone_fitness(lambda, max_clone_freq, tend, time_occur[0]);
@@ -113,7 +113,6 @@ int main(int argc, char const *argv[]) {
         }
         cout << endl;
     }
-
 
 
     cout << "Simulating tumor growth" << endl;
@@ -139,11 +138,16 @@ int main(int argc, char const *argv[]) {
         clone.print_map(mut_freq, outfile);
     }
 
+
     outfile = outdir + "subclone_freq" + suffix;
     cout << "Computing subclone frequency" << endl;
     map<int, double> subclone_freq = clone.get_subclone_freq();
     clone.print_map(subclone_freq, outfile);
     cout << clone.subclone_ID.size() << " subclone(s)" << endl;
+
+    outfile = outdir + "subclone_lineage" + suffix;
+    cout << "Printing subclone lineage" << endl;
+    clone.print_clone_lineage(outfile);
 
 
     cout << "Sampling from the tumor" << endl;
